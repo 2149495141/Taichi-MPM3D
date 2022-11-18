@@ -131,7 +131,7 @@ def initialize():
 
 def T(a):  # 投影变换
 
-    phi, theta = np.radians(28), np.radians(32)
+    phi, theta = np.radians(28), np.radians(32)  # 左右角度， 上下角度
 
     a = a - 0.5
     x, y, z = a[:, 0], a[:, 1], a[:, 2]
