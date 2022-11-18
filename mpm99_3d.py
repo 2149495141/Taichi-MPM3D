@@ -5,8 +5,10 @@ import taichi as ti
 
 ti.init(arch=ti.gpu)  # 尝试在 GPU 上运行
 
-dim, n_grid, steps, dt = 3, 64, 24, 4e-4  # 维度, 网格数, 帧数, 时间步长
-#dim, n_grid, steps, dt = 3, 128, 6, 2.4e-4
+
+#dim, n_grid, steps, dt, res = 3, 64, 24, 3e-4, 500  # 维度, 网格数, 模拟帧率, 时间步长, 分辨率
+dim, n_grid, steps, dt, res = 3, 64, int(2e-3 // 4e-4), 4e-4, 400  # 更友好的配置
+#dim, n_grid, steps, dt, res = 3, 128, int(2e-3 // 2e-4), 2e-4, 720  # 更好的效果
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
 dx, inv_dx = 1 / n_grid, float(n_grid)
@@ -17,16 +19,15 @@ bound = 3
 E, nu = 400, 0.2  # 杨氏模量和泊松比
 mu_0, lambda_0 = E / (2 * (1 + nu)), E * nu / ((1 + nu) * (1 - 2 * nu))  # 拉梅参数
 
-x = ti.Vector.field(dim, dtype=float, shape=n_particles)  # 位置
-v = ti.Vector.field(dim, dtype=float, shape=n_particles)  # 速度
-C = ti.Matrix.field(dim, dim, dtype=float, shape=n_particles)  # 仿射速度场
-F = ti.Matrix.field(dim, dim, dtype=float, shape=n_particles)  # 变形梯度
-Jp = ti.field(dtype=float, shape=n_particles)  # 塑性变形
-grid_v = ti.Vector.field(dim, dtype=float, shape=(n_grid, )*dim)  # 网格节点动量/速度
-grid_m = ti.field(dtype=float, shape=(n_grid,)*3)  # 网格节点质量
-material = ti.field(dtype=int, shape=n_particles)  # 材质 id
+x = ti.Vector.field(dim, dtype=ti.f32, shape=n_particles)  # 位置
+v = ti.Vector.field(dim, dtype=ti.f32, shape=n_particles)  # 速度
+C = ti.Matrix.field(dim, dim, dtype=ti.f32, shape=n_particles)  # 仿射速度场
+F = ti.Matrix.field(dim, dim, dtype=ti.f32, shape=n_particles)  # 变形梯度
+Jp = ti.field(dtype=ti.f32, shape=n_particles)  # 塑性变形
+grid_v = ti.Vector.field(dim, dtype=ti.f32, shape=(n_grid, )*dim)  # 网格节点动量/速度
+grid_m = ti.field(dtype=ti.f32, shape=(n_grid,)*3)  # 网格节点质量
+material = ti.field(dtype=ti.int32, shape=n_particles)  # 材质 id
 neighbour = (3, ) * dim
-
 
 @ti.kernel
 def substep():
@@ -60,7 +61,7 @@ def substep():
             sig[d, d] = new_sig
             J *= new_sig
         if material[p] == 0:  # 重置变形梯度以避免数值不稳定
-            # F[p] = ti.Matrix.identity(float, 3) * ti.sqrt(J)
+            F[p] = ti.Matrix.identity(float, 3) * ti.sqrt(J)
             new_F = ti.Matrix.identity(float, 3)
             new_F[0, 0] = J
             F[p] = new_F
@@ -100,13 +101,11 @@ def substep():
             g_v = grid_v[base + offset]
             new_v += weight * g_v
             new_C += 4 * weight * g_v.outer_product(dpos) / dx ** 2
-        v[p] = new_v
-        # J[p] *= 1 + dt * new_C.trace()
-        C[p] = new_C
+        v[p], C[p] = new_v, new_C
         x[p] += dt * v[p]
 
 
-group_size = n_particles // 3  # 组大小
+group_size = n_particles // 3  # 材质块粒子数
 
 
 @ti.kernel
@@ -114,29 +113,23 @@ def copy_material(np_x: ti.ext_arr(), input_x: ti.template()):
     for i in x:
         np_x[i] = input_x[i]
 
-
 @ti.kernel
 def copy_color(np_c: ti.ext_arr(), input_c: ti.ext_arr()):
     for i in x:
         np_c[i] = input_c[i]
 
-
-
 @ti.kernel
 def initialize():
-    for i in range(n_particles):
-        x[i] = [ti.random() * 0.1 + 0.3 + 0.08 * (i // group_size),  # x长度 + 所有粒子的x轴位置 + 每个材质块x轴之间的间隔
-                ti.random() * 0.2 + 0.05 + 0.32 * (i // group_size),  # y长度 + 所有粒子的y轴位置 + 每个材质块y轴之间的间隔
-                ti.random() * 0.2 + 0.3 + 0.1 * (i // group_size)]  # z长度 + 所有粒子的z轴位置 + 每个材质块z轴之间的间隔
-        #x[i] = ti.Vector([ti.random() for i in range(dim)]) * 0.4 + 0.15
-        #x[i] = ti.Vector([ti.random() for i in range(dim)]) * (i // group_size)
-        material[i] = i // group_size  # 0:流体; 1:果冻; 2:雪;
-        v[i] = ti.Matrix([0, 0, 0])
-        F[i] = ti.Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+    for i in range(n_particles):  # 初始化粒子的位置
+        x[i] = [ti.random() * 0.2 + 0.3 + 0.08 * (i // group_size),  # 材质块x长度(随机*x偏移量） + 所有粒子的在x轴位置 + 材质块x轴的相对间隔(x偏移量*(粒子i//材质块粒子数，粒子i超过材质块粒子数时说明在下一材质块内，偏移一个整数量))
+                ti.random() * 0.2 + 0.5 + 0.32 * (i // group_size),  # 材质块y长度(随机*y偏移量） + 所有粒子的在y轴位置 + 材质块y轴的相对间隔(y偏移量*(例如:材质块粒子数=21845, 21845//21845=1,粒子在第二个材质块偏移量为1))
+                ti.random() * 0.2 + 0.3 + 0.1 * (i // group_size)]  # 材质块z长度(随机*z偏移量） + 所有粒子的在z轴位置 + 材质块z轴的相对间隔(z偏移量*(材质块ID))
+        material[i] = i // group_size  # 材质块ID 0:流体; 1:果冻; 2:雪;
+        v[i] = ti.Matrix([0, 0, 0])  # 初始化速度
+        F[i] = ti.Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])  # 初始化形变梯度
         Jp[i] = 1
 
-
-def T(a):
+def T(a):  # 投影变换
 
     phi, theta = np.radians(28), np.radians(32)
 
@@ -150,19 +143,19 @@ def T(a):
 
 
 initialize()
-gui = ti.GUI("Taichi MLS-MPM-99-3D", res=720, background_color=0x112F41)
+gui = ti.GUI("Taichi MLS-MPM-99-3D", res, background_color=0x112F41)
 while gui.running and not gui.get_event(gui.ESCAPE):
+
     for s in range(steps):
-        substep()
-    pos = x.to_numpy()
+        substep()  # 更新模拟帧
+    pos = x.to_numpy()  # 转换位置的类型
 
-    colors = np.array([0x068599, 0xFF8888, 0xEEEEF0], dtype=np.int32)
-    np_color = np.ndarray((n_particles,), dtype=np.int32)
-    copy_color(np_color, colors)
+    colors = np.array([0x068599, 0xFF8888, 0xEEEEF0], dtype=np.uint32)  # 材质颜色
+    np_color = np.ndarray((n_particles,), dtype=np.uint32)  # 粒子颜色
+    copy_color(np_color, colors)  # 把颜色一一对应赋给粒子
 
-    np_material = np.ndarray((n_particles,), dtype=np.uint32)
-    copy_material(np_material, material)
+    np_material = np.ndarray((n_particles,), dtype=np.uint32)  # 粒子材质属性
+    copy_material(np_material, material)  # 把材质属性一一对应赋给粒子
 
     gui.circles(T(pos), radius=1.4, color=np_color[np_material])
-               # palette=[0x068587, 0xed5555, 0xeeeef0], palette_indices=material)
     gui.show()
