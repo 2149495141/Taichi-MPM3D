@@ -11,11 +11,11 @@ dim, n_grid, steps, dt, res = 3, 64, 24, 3e-4, 500  # 维度, 网格数, 模拟�
 #dim, n_grid, steps, dt, res = 3, 128, int(2e-3 // 2e-4), 2e-4, 720  # 更好的效果
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
-dx, inv_dx = 1 / n_grid, float(n_grid)
+dx, inv_dx = 1 / n_grid, float(n_grid)  # 格点（单个网格的中心）
 p_vol, p_rho = (dx * 0.5) ** 2, 1
 p_mass = p_vol * p_rho  # 粒子质量
-gravity = 9.8
-bound = 3
+gravity = 9.8  # 重力
+bound = 3  # 边界值
 E, nu = 400, 0.2  # 杨氏模量和泊松比
 mu_0, lambda_0 = E / (2 * (1 + nu)), E * nu / ((1 + nu) * (1 - 2 * nu))  # 拉梅参数
 
@@ -24,18 +24,18 @@ v = ti.Vector.field(dim, dtype=ti.f32, shape=n_particles)  # 速度
 C = ti.Matrix.field(dim, dim, dtype=ti.f32, shape=n_particles)  # 仿射速度场
 F = ti.Matrix.field(dim, dim, dtype=ti.f32, shape=n_particles)  # 变形梯度
 Jp = ti.field(dtype=ti.f32, shape=n_particles)  # 塑性变形
-grid_v = ti.Vector.field(dim, dtype=ti.f32, shape=(n_grid, )*dim)  # 网格节点动量/速度
+grid_v = ti.Vector.field(dim, dtype=ti.f32, shape=(n_grid, )*dim)  # 网格节点动量
 grid_m = ti.field(dtype=ti.f32, shape=(n_grid,)*3)  # 网格节点质量
-material = ti.field(dtype=ti.int32, shape=n_particles)  # 材质 id
+material = ti.field(dtype=ti.int32, shape=n_particles)  # 粒子材质
 neighbour = (3, ) * dim
 
 @ti.kernel
 def substep():
     for I in ti.grouped(grid_m):
-        grid_v[I] = ti.zero(grid_v[I])
-        grid_m[I] = 0
+        grid_v[I] = ti.zero(grid_v[I])  # 重置每个网格节点的速度
+        grid_m[I] = 0  # 重置每个网格节点的质量
     ti.block_dim(n_grid)
-    for p in x:  # 粒子状态更新和散布到网格 (P2G)
+    for p in x:  # 把粒子状态更新到网格节点 (P2G)
         Xp = x[p] / dx
         base = int(Xp - 0.5)
         fx = Xp - base
@@ -79,14 +79,14 @@ def substep():
                 weight *= w[offset[i]][i]
             grid_v[base + offset] += weight * (p_mass * v[p] + affine @ dpos)
             grid_m[base + offset] += weight * p_mass
-    for I in ti.grouped(grid_m):
+    for I in ti.grouped(grid_m):  # (P2G) 这一步是为了把网格内粒子的质量加权平均赋加到网格上
         if grid_m[I] > 0:
             grid_v[I] /= grid_m[I]
         grid_v[I][1] -= dt * gravity
         cond = I < bound and grid_v[I] < 0 or I > n_grid - bound and grid_v[I] > 0  # 边界条件
         grid_v[I] = 0 if cond else grid_v[I]
     ti.block_dim(n_grid)
-    for p in x:
+    for p in x:  # 从网格节点获取状态到粒子 (G2P)
         Xp = x[p] / dx
         base = int(Xp - 0.5)
         fx = Xp - base
@@ -151,11 +151,11 @@ while gui.running and not gui.get_event(gui.ESCAPE):
     pos = x.to_numpy()  # 转换位置的类型
 
     colors = np.array([0x068599, 0xFF8888, 0xEEEEF0], dtype=np.uint32)  # 材质颜色
-    np_color = np.ndarray((n_particles,), dtype=np.uint32)  # 粒子颜色
-    copy_color(np_color, colors)  # 把颜色一一对应赋给粒子
+    np_color = np.ndarray((n_particles,), dtype=np.uint32)  # 粒子颜色数组
+    copy_color(np_color, colors)  # 把颜色一一对应赋给粒子颜色数组
 
-    np_material = np.ndarray((n_particles,), dtype=np.uint32)  # 粒子材质属性
-    copy_material(np_material, material)  # 把材质属性一一对应赋给粒子
+    np_material = np.ndarray((n_particles,), dtype=np.uint32)  # 粒子材质索引数组
+    copy_material(np_material, material)  # 把材质属性一一对应赋给材质索引数组
 
     gui.circles(T(pos), radius=1.4, color=np_color[np_material])
     gui.show()
