@@ -6,8 +6,8 @@ import taichi as ti
 ti.init(arch=ti.gpu)  # 尝试在 GPU 上运行
 
 
-#dim, n_grid, steps, dt, res = 3, 64, int(2e-3 // 3e-4), 3e-4, 500  # 更友好的配置
-dim, n_grid, steps, dt, res = 3, 128, 8, 1e-4, 720  # 维度, 网格数, 模拟帧率, 时间步长, 分辨率
+dim, n_grid, steps, dt, res = 3, 64, int(2e-3 // 3e-4), 3e-4, 500  # 更友好的配置
+#dim, n_grid, steps, dt, res = 3, 128, 8, 1e-4, 720  # 维度, 网格数, 模拟帧率, 时间步长, 分辨率
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
 dx, inv_dx = 1 / n_grid, float(n_grid)  # 格点（单个网格的中心）
