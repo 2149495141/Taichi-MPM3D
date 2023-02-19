@@ -61,7 +61,6 @@ def substep():
             sig[d, d] = new_sig
             J *= new_sig
         if material[p] == 0:
-            F[p] = ti.Matrix.identity(float, 3) * ti.sqrt(J)
             new_F = ti.Matrix.identity(float, 3)
             new_F[0, 0] = J
             F[p] = new_F  # 重置变形梯度以避免数值不稳定
@@ -128,7 +127,7 @@ def initialize():
         material[i] = i // group_size  # 材质块ID 0:流体; 1:果冻; 2:雪;
         v[i] = ti.Matrix([0, 0, 0])  # 初始化速度
         F[i] = ti.Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])  # 初始化形变梯度
-        Jp[i] = 1  # 体积
+        Jp[i] = 1  #初始化形变
 
 
 def T(a):  # 视角投影变换
