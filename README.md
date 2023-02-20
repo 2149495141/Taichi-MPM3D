@@ -3,4 +3,5 @@
 - ![mpm_1.gif](mpm_1.gif)
 
 # 运行文件需要安装taichi
-pip install taichi
+安装命令：
+`pip install taichi`
