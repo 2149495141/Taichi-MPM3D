@@ -7,9 +7,9 @@ dim, n_grid, steps, dt, res = 3, 64, 64, 2e-4, 360
 #dim, n_grid, steps, dt, res = 3, 128, 16, 1e-4, 640  # 维度, 网格数, 模拟帧率, 时间步长, 分辨率
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
-dx= 1 / n_grid
+dx = 1 / n_grid
 inv_dx =  float(n_grid)  # 格点（单个网格的中心）
-p_vol= (dx * 0.5) ** 2 
+p_vol = (dx * 0.5) ** 2 
 p_rho = 1
 p_mass = p_vol * p_rho  # 粒子质量
 gravity = 9.8  # 重力
@@ -45,7 +45,6 @@ def substep():
         fx = Xp - base
         w = [0.5 * (1.5 - fx) ** 2, 0.75 - (fx - 1) ** 2, 0.5 * (fx - 0.5) ** 2]
         F[p] = (ti.Matrix.identity(float, 3) + dt * C[p]) @ F[p]  # 变形梯度更新
-
         h = ti.exp(10 * (1 - Jp[p]))  # 硬化系数：雪被压缩时变硬
         if material[p] == 1:  # 果冻，让它变软
             h = 0.3
@@ -67,11 +66,9 @@ def substep():
             F[p] = new_F  # 重置变形梯度以避免数值不稳定
         elif material[p] == 2:
             F[p] = U @ sig @ V.transpose()  # 塑性后重建弹性变形梯度
-
         stress = 2 * mu * (F[p] - U @ V.transpose()) @ F[p].transpose() + ti.Matrix.identity(float, 3) * la * J * (J - 1)
         stress = (-dt * p_vol * 4) * stress / dx**2
         affine = stress + p_mass * C[p]
-
         for offset in ti.static(ti.grouped(ti.ndrange(*neighbour))):
             dpos = (offset - fx) * dx
             weight = 1.0
