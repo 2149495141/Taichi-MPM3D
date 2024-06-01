@@ -8,7 +8,7 @@ dim, n_grid, steps, dt, res = 3, 64, 40, 2e-4, 360
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
 dx = 1 / n_grid
-inv_dx =  float(n_grid)  # 格点（单个网格的中心）
+inv_dx = float(n_grid)  # 格点（单个网格的中心）
 p_vol = (dx * 0.5) ** 2 
 p_rho = 1
 p_mass = p_vol * p_rho  # 粒子质量
@@ -113,9 +113,9 @@ def copy_mat_color(np_m: ti.types.ndarray(), np_c: ti.types.ndarray(), colors: t
 @ti.kernel
 def initialize():
     for i in range(n_particles):  # 初始化粒子的位置
-        x[i] = [ti.random() * 0.1 + 0.3 + 0.03 * (i // group_size),  # 材质块x长度(随机*x偏移量） + 所有粒子的在x轴位置 + 材质块x轴的相对间隔(x偏移量*(粒子i//材质块粒子数，粒子i超过材质块粒子数时说明在下一材质块内，偏移一个整数量))
-                ti.random() * 0.2 + 0.1 + 0.3 * (i // group_size),  # 材质块y长度(随机*y偏移量） + 所有粒子的在y轴位置 + 材质块y轴的相对间隔(y偏移量*(例如:材质块粒子数=21845, 21845//21845=1, 粒子在第二个材质块偏移量为1))
-                ti.random() * 0.2 + 0.3 + 0.1 * (i // group_size)]  # 材质块z长度(随机*z偏移量） + 所有粒子的在z轴位置 + 材质块z轴的相对间隔(z偏移量*(材质块ID))
+        x[i] = [ti.random() * 0.1 + 0.3 + 0.03 * (i // group_size), # 材质块x长度(随机填充) + 所有粒子的在x轴位置 + 材质块x轴的相对间隔(粒子i//材质块粒子数，粒子i超过材质块粒子数时说明在下一材质块内，偏移一个整数量)
+                ti.random() * 0.2 + 0.1 + 0.3 * (i // group_size),  # 材质块y长度 + 所有粒子的在y轴位置 + 材质块y轴的相对间隔
+                ti.random() * 0.2 + 0.3 + 0.1 * (i // group_size)]  # 材质块z长度 + 所有粒子的在z轴位置 + 材质块z轴的相对间隔
         material[i] = i // group_size  # 材质块ID 0:流体; 1:果冻; 2:雪;
         v[i] = ti.Matrix([0, 0, 0])  # 初始化速度
         F[i] = ti.Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])  # 初始化形变梯度
