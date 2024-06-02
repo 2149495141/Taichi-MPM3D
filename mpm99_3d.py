@@ -46,7 +46,6 @@ def substep():
         fx = Xp - base
         w = [0.5 * (1.5 - fx) ** 2, 0.75 - (fx - 1) ** 2, 0.5 * (fx - 0.5) ** 2]
         F[p] = (ti.Matrix.identity(float, 3) + dt * C[p]) @ F[p]  # 变形梯度更新
-
         h = ti.exp(10 * (1 - Jp[p]))  # 硬化系数：雪被压缩时变硬
         if material[p] == 1:  # 果冻，让它变软
             h = 0.3
