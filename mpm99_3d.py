@@ -8,13 +8,13 @@ dim, n_grid, steps, dt, res = 3, 64, 40, 2e-4, 360
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
 dx = 1 / n_grid
-inv_dx = float(n_grid)  # 格点（单个网格的中心）
-p_vol = (dx * 0.5) ** 2 
+inv_dx =  float(n_grid)  # 格点（单个网格的中心）
+p_vol= (dx * 0.5) ** 2 
 p_rho = 1
 p_mass = p_vol * p_rho  # 粒子质量
 gravity = 9.8  # 重力
 bound = 3  # 边界值
-E= 400
+E = 400
 nu = 0.2  # 杨氏模量和泊松比
 mu_0 = E / (2 * (1 + nu))
 lambda_0 = E * nu / ((1 + nu) * (1 - 2 * nu))  # 拉梅参数
@@ -26,7 +26,8 @@ F = ti.Matrix.field(dim, dim, dtype=ti.f32, shape=n_particles)  # 变形梯度�
 Jp = ti.field(dtype=ti.f32, shape=n_particles)  # 塑性变形数组
 grid_v = ti.Vector.field(dim, dtype=ti.f32, shape=(n_grid, ) * dim)  # 网格节点动量数组
 grid_m = ti.field(dtype=ti.f32, shape=(n_grid, ) * dim)  # 网格节点质量数组
-material = ti.field(dtype=ti.int32, shape=n_particles)  # 粒子材质数组
+material = ti.field(dtype=ti.uint32, shape=n_particles)  # 粒子材质数组
+color = ti.field(dtype=ti.uint32, shape=n_particles)  # 粒子颜色数组
 
 neighbour = (3, ) * dim
 group_size = n_particles // 3  # 每个材质块的粒子数
@@ -45,6 +46,7 @@ def substep():
         fx = Xp - base
         w = [0.5 * (1.5 - fx) ** 2, 0.75 - (fx - 1) ** 2, 0.5 * (fx - 0.5) ** 2]
         F[p] = (ti.Matrix.identity(float, 3) + dt * C[p]) @ F[p]  # 变形梯度更新
+
         h = ti.exp(10 * (1 - Jp[p]))  # 硬化系数：雪被压缩时变硬
         if material[p] == 1:  # 果冻，让它变软
             h = 0.3
@@ -105,18 +107,14 @@ def substep():
         x[p] += dt * v[p]
 
 @ti.kernel
-def copy_mat_color(np_m: ti.types.ndarray(), np_c: ti.types.ndarray(), colors: ti.types.ndarray()):
-    for i in x:
-        np_m[i] = material[i]
-        np_c[i] = colors[i]
-
-@ti.kernel
 def initialize():
+    arr = ti.Vector([0x068599, 0xFF8888, 0xEEEEF0])
     for i in range(n_particles):  # 初始化粒子的位置
-        x[i] = [ti.random() * 0.1 + 0.3 + 0.03 * (i // group_size), # (在指定长度内随机填充) + 所有粒子的在x轴位置 + (粒子i//材质块粒子数，粒子i超过材质块粒子数时说明在下一材质块内，偏移一个整数量)
-                ti.random() * 0.2 + 0.1 + 0.3 * (i // group_size),  # 材质块y长度 + 所有粒子的在y轴位置 + 每个材质块在y轴之间的间隔
-                ti.random() * 0.2 + 0.3 + 0.1 * (i // group_size)]  # 材质块z长度 + 所有粒子的在z轴位置 + 每个材质块在z轴之间的间隔
+        x[i] = [ti.random() * 0.1 + 0.3 + 0.03 * (i // group_size),  # 材质块x长度(随机*x偏移量） + 所有粒子的在x轴位置 + 材质块x轴的相对间隔(x偏移量*(粒子i//材质块粒子数，粒子i超过材质块粒子数时说明在下一材质块内，偏移一个整数量))
+                ti.random() * 0.2 + 0.1 + 0.3 * (i // group_size),  # 材质块y长度(随机*y偏移量） + 所有粒子的在y轴位置 + 材质块y轴的相对间隔(y偏移量*(例如:材质块粒子数=21845, 21845//21845=1, 粒子在第二个材质块偏移量为1))
+                ti.random() * 0.2 + 0.3 + 0.1 * (i // group_size)]  # 材质块z长度(随机*z偏移量） + 所有粒子的在z轴位置 + 材质块z轴的相对间隔(z偏移量*(材质块ID))
         material[i] = i // group_size  # 材质块ID 0:流体; 1:果冻; 2:雪;
+        color[i] = arr[i]
         v[i] = ti.Matrix([0, 0, 0])  # 初始化速度
         F[i] = ti.Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])  # 初始化形变梯度
         Jp[i] = 1
@@ -134,16 +132,11 @@ def T(a):  # 视角投影变换
 
 
 initialize()
-gui = ti.GUI("MLS-MPM-3D", res, background_color=0x112F41)
-
-colors = np.array([0x068599, 0xFF8888, 0xEEEEF0], dtype=np.uint32)  # 材质颜色
-np_color = np.ndarray((n_particles, ), dtype=np.uint32)  # 粒子颜色数组
-np_material = np.ndarray((n_particles, ), dtype=np.uint32)  # 粒子材质索引数组
-copy_mat_color(np_material, np_color, colors)
-
+gui = ti.GUI("MLS-MPM-99-3D", res, background_color=0x112F41)
 while gui.running and not gui.get_event(gui.ESCAPE):
     for s in range(steps):
         substep()  # 更新模拟帧
-    pos = x.to_numpy()  # 转换位置为numpy数组，以便GUI调用
-    gui.circles(T(pos), radius=1.2, color=np_color[np_material])
+    pos = x.to_numpy()
+    colors = color.to_numpy()
+    gui.circles(T(pos), radius=1.2, color=colors[material.to_numpy()])
     gui.show()
