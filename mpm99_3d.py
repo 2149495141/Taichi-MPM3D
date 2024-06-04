@@ -127,7 +127,7 @@ def T(a):  # 视角投影变换
     C, S = np.cos(theta), np.sin(theta)
     x, z = x * c + z * s, z * c - x * s
     u, v = x, y * C + z * S
-    return np.array([u, v]).swapaxes(0, 1) + 0.5
+    return np.array([u, v]).swapaxes(0, 1) + 0.55
 
 
 initialize()
