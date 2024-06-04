@@ -15,8 +15,8 @@ p_mass = p_vol * p_rho  # 粒子质量
 gravity = 9.8  # 重力
 bound = 3  # 边界值
 E = 400
-nu = 0.2  # 杨氏模量和泊松比
-mu_0 = E / (2 * (1 + nu))
+nu = 0.2  # 杨氏模量
+mu_0 = E / (2 * (1 + nu))  # 泊松比
 lambda_0 = E * nu / ((1 + nu) * (1 - 2 * nu))  # 拉梅参数
 
 X = ti.Vector.field(dim, dtype=ti.f32, shape=n_particles)  # 位置向量数组
