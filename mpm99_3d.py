@@ -6,17 +6,17 @@ ti.init(arch=ti.gpu)  # 尝试在 GPU 上运行
 dim, n_grid, steps, dt, R, res = 3, 64, 29, 2e-4, 1.2, 360 
 #dim, n_grid, steps, dt, R, res = 3, 128, 16, 1e-4, 1, 480  # 维度, 网格数, 模拟帧率, 时间步长, 半径, 分辨率
 
-n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数
-dx = 1 / n_grid
+n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数量
+dx = 1 / n_grid  # 网格间距
 inv_dx =  float(n_grid)  # 格点（单个网格的中心）
-p_vol= (dx * 0.5) ** 2 
-p_rho = 1
+p_vol= (dx * 0.5) ** 2  # 粒子体积
+p_rho = 1  # 粒子密度
 p_mass = p_vol * p_rho  # 粒子质量
 gravity = 9.8  # 重力
 bound = 3  # 边界值
-E = 400
-nu = 0.2  # 杨氏模量
-mu_0 = E / (2 * (1 + nu))  # 泊松比
+E = 400  # 杨氏模量
+nu = 0.2  # 泊松比
+mu_0 = E / (2 * (1 + nu))  # 剪切模量
 lambda_0 = E * nu / ((1 + nu) * (1 - 2 * nu))  # 拉梅参数
 
 X = ti.Vector.field(dim, dtype=ti.f32, shape=n_particles)  # 位置向量数组
@@ -48,7 +48,7 @@ def substep():
         F[p] = (ti.Matrix.identity(float, 3) + dt * C[p]) @ F[p]  # 变形梯度更新
         h = 0.3 if (material[p] == 1) else ti.exp(10 * (1 - J[p]))  # h是硬化系数，如果材质是果冻就限制硬化强度
         la = lambda_0 * h
-        mu = 0.0 if (material[p] == 0) else mu_0 * h  # 如果材质是液体设泊松比为0
+        mu = 0.0 if (material[p] == 0) else mu_0 * h  # 如果材质是液体剪切模量设为0
         u, sig, v = ti.svd(F[p])
         j = 1.0  # J是粒子的体积变化
         for d in ti.static(range(3)):
