@@ -46,13 +46,13 @@ def substep():
         fx = xp - base
         w = [0.5 * (1.5 - fx) ** 2, 0.75 - (fx - 1) ** 2, 0.5 * (fx - 0.5) ** 2]
         F[p] = (ti.Matrix.identity(float, 3) + dt * C[p]) @ F[p]  # 变形梯度更新
-        h = 0.3 if (material[p] == 1) else ti.exp(10 * (1 - J[p]))  #h是硬化系数，如果是果冻就限制硬化强度
+        h = 0.3 if (material[p] == 1) else ti.exp(10 * (1 - J[p]))  # h是硬化系数，如果材质是果冻就限制硬化强度
         la = lambda_0 * h
-        mu = 0.0 if (material[p] == 0) else mu_0 * h  #如果是液体设泊松比为0
+        mu = 0.0 if (material[p] == 0) else mu_0 * h  # 如果材质是液体设泊松比为0
         u, sig, v = ti.svd(F[p])
         j = 1.0  # J是粒子的体积变化
         for d in ti.static(range(3)):
-            new_sig = ti.min(ti.max(sig[d, d], 1 - 2.5e-2), 1 + 5.4e-3) if (material[p] == 2) else sig[d, d]  #如果是雪限制塑性范围
+            new_sig = ti.min(ti.max(sig[d, d], 1 - 2.5e-2), 1 + 5.4e-3) if (material[p] == 2) else sig[d, d]  # 如果材质是雪限制塑性范围
             J[p] *= sig[d, d] / new_sig
             sig[d, d] = new_sig
             j *= new_sig
@@ -111,7 +111,7 @@ def initialize():
         color[i] = mat_colors[i]
         V[i] = ti.Matrix([0, 0, 0])  # 初始化速度
         F[i] = ti.Matrix([[1, 0, 0], [0, 1, 0], [0, 0, 1]])  # 初始化形变梯度
-        J[i] = 1
+        J[i] = 1  # 初始化塑性变形
 
 def T(a):  # 视角投影变换
     phi, theta = np.radians(30), np.radians(30)  # 左右角度， 上下角度
