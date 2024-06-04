@@ -48,11 +48,11 @@ def substep():
         F[p] = (ti.Matrix.identity(float, 3) + dt * C[p]) @ F[p]  # 变形梯度更新
         h = 0.3 if (material[p] == 1) else ti.exp(10 * (1 - J[p]))  # h是硬化系数，如果材质是果冻就限制硬化强度
         la = lambda_0 * h
-        mu = 0.0 if (material[p] == 0) else mu_0 * h  # 如果材质是液体剪切模量设为0
+        mu = 0.0 if (material[p] == 0) else mu_0 * h  # 如果材质是液体就设剪切模量为0
         u, sig, v = ti.svd(F[p])
         j = 1.0  # J是粒子的体积变化
         for d in ti.static(range(3)):
-            new_sig = ti.min(ti.max(sig[d, d], 1 - 2.5e-2), 1 + 5.4e-3) if (material[p] == 2) else sig[d, d]  # 如果材质是雪限制塑性范围
+            new_sig = ti.min(ti.max(sig[d, d], 1 - 2.5e-2), 1 + 5.4e-3) if (material[p] == 2) else sig[d, d]  # 如果材质是雪就限制塑性范围
             J[p] *= sig[d, d] / new_sig
             sig[d, d] = new_sig
             j *= new_sig
