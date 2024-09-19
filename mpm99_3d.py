@@ -4,7 +4,7 @@ import taichi as ti
 ti.init(arch=ti.gpu)  # 尝试在 GPU 上运行
  
 dim, n_grid, steps, dt, R, res = 3, 64, 29, 2e-4, 1.2, 360 
-#dim, n_grid, steps, dt, R, res = 3, 128, 16, 1e-4, 1, 480  # 维度, 网格数, 模拟帧率, 时间步长, 半径, 分辨率
+#dim, n_grid, steps, dt, R, res = 3, 128, 16, 1e-4, 1, 480  # 维度, 网格数, 模拟帧率, 时间步长, 粒子半径, 分辨率
 
 n_particles = n_grid**dim // 2**(dim - 1)  # 粒子数量
 dx = 1 / n_grid  # 网格间距
